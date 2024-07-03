@@ -10,14 +10,37 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"net/http"
+	"os"
 )
 
+// var collection *mongo.Collection
+//
+//	func InitDataBase() {
+//		URI := "mongodb://localhost:27017"
+//
+//		clientOptions := options.Client().ApplyURI(URI)
+//		client, err := mongo.Connect(context.Background(), clientOptions)
+//		if err != nil {
+//			panic(err)
+//		}
+//
+//		err = client.Ping(context.Background(), nil)
+//		if err != nil {
+//			panic(err)
+//		}
+//
+//		collection = client.Database("CRUD").Collection("test")
+//	}
 var collection *mongo.Collection
 
 func InitDataBase() {
-	URI := "mongodb://localhost:27017"
+	// Используем переменную окружения для URI MongoDB
+	mongoURL := os.Getenv("MONGO_URL")
+	if mongoURL == "" {
+		mongoURL = "mongodb://localhost:27017"
+	}
 
-	clientOptions := options.Client().ApplyURI(URI)
+	clientOptions := options.Client().ApplyURI(mongoURL)
 	client, err := mongo.Connect(context.Background(), clientOptions)
 	if err != nil {
 		panic(err)
