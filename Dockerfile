@@ -1,9 +1,3 @@
-#FROM ubuntu:latest
-#LABEL authors="xuver"
-#
-#ENTRYPOINT ["top", "-b"]
-
-
 FROM golang:1.20-alpine
 
 WORKDIR /build

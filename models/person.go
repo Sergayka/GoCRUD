@@ -7,4 +7,5 @@ type Person struct {
 	FirstName string             `json:"first_name" bson:"first_name"`
 	LastName  string             `json:"last_name" bson:"last_name"`
 	City      string             `json:"city" bson:"city"`
+	AvatarURL string             `json:"avatar_url" bson:"avatar_url"`
 }

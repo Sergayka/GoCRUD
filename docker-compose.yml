@@ -5,7 +5,7 @@ services:
     image: mongo:latest
     container_name: mongo
     ports:
-      - "27017:27017"
+      - "27017:27017" # "27018:27017"
     volumes:
       - mongo-data:/data/db
     environment:
@@ -21,6 +21,20 @@ services:
       - mongo
     environment:
       MONGO_URL: mongodb://mongo:27017
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_EXTERNAL_HOST: localhost:9000
+
+  minio:
+    image: minio/minio
+    container_name: minio
+    ports:
+      - "9000:9000"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data
 
 volumes:
   mongo-data:

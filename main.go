@@ -8,6 +8,7 @@ import (
 
 func main() {
 	controllers.InitDataBase()
+	controllers.InitMinio()
 
 	router := gin.Default()
 
@@ -19,7 +20,14 @@ func main() {
 	})
 
 	router.GET("/persons", controllers.ReadPerson)
+	router.GET("/avatars/:fileName", func(c *gin.Context) {
+		fileName := c.Param("fileName")
+		c.File("./uploads/" + fileName)
+	})
+
 	router.POST("/persons", controllers.CreatePerson)
+
+	//router.POST("/upload-avatar", controllers.UploadAvatar)
 
 	router.GET("/persons/:id", controllers.GetPersonByID)
 	router.PUT("/persons/:id", controllers.UpdatePerson)

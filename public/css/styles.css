@@ -4,13 +4,11 @@ body {
     color: #333;
     margin: 0;
     padding: 0;
-    /*display: flex;*/
     flex-direction: column;
-    /*align-items: center;*/
     justify-content: center;
     height: 100vh;
-    /*text-align: center;*/
 }
+
 h1, h2 {
     color: #333;
 }
@@ -50,11 +48,29 @@ th {
     background-color: #f2f2f2;
 }
 
-
 .delete-btn {
     background-color: transparent;
     border: none;
     color: red;
     cursor: pointer;
     font-size: 16px;
+}
+
+#avatarForm {
+    margin-top: 20px;
+}
+
+#avatarForm label {
+    display: block;
+    margin: 5px 0 2px;
+}
+
+#avatarForm input {
+    margin-bottom: 10px;
+    padding: 5px;
+    width: 200px;
+}
+
+#avatarForm button {
+    padding: 5px 10px;
 }

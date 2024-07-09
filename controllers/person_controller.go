@@ -4,37 +4,24 @@ import (
 	"GoCRUD/models"
 	"context"
 	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"net/http"
 	"os"
+	"path/filepath"
 )
 
-// var collection *mongo.Collection
-//
-//	func InitDataBase() {
-//		URI := "mongodb://localhost:27017"
-//
-//		clientOptions := options.Client().ApplyURI(URI)
-//		client, err := mongo.Connect(context.Background(), clientOptions)
-//		if err != nil {
-//			panic(err)
-//		}
-//
-//		err = client.Ping(context.Background(), nil)
-//		if err != nil {
-//			panic(err)
-//		}
-//
-//		collection = client.Database("CRUD").Collection("test")
-//	}
+var minioClient *minio.Client
+
 var collection *mongo.Collection
 
 func InitDataBase() {
-	// Используем переменную окружения для URI MongoDB
 	mongoURL := os.Getenv("MONGO_URL")
 	if mongoURL == "" {
 		mongoURL = "mongodb://localhost:27017"
@@ -54,20 +41,104 @@ func InitDataBase() {
 	collection = client.Database("CRUD").Collection("test")
 }
 
-func CreatePerson(c *gin.Context) { // получил по башке за context
-	var person models.Person
+func InitMinio() {
+	endpoint := os.Getenv("MINIO_ENDPOINT")
+	accessKeyID := os.Getenv("MINIO_ACCESS_KEY")
+	secretAccessKey := os.Getenv("MINIO_SECRET_KEY")
 
-	if err := c.ShouldBindJSON(&person); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	var err error
+	minioClient, err = minio.New(endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(accessKeyID, secretAccessKey, ""),
+		Secure: false,
+	})
+	if err != nil {
+		panic(err)
+	}
+}
+
+func CreatePerson(c *gin.Context) { // получил по башке за context
+	// Получаем файл аватарки из формы
+	file, header, err := c.Request.FormFile("avatar")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to get avatar"})
 		return
 	}
+	defer file.Close()
 
-	person.ID = primitive.NewObjectID()
-	_, err := collection.InsertOne(context.Background(), person)
+	// Генерируем уникальное имя для файла
+	fileName := fmt.Sprintf("%s%s", primitive.NewObjectID().Hex(), filepath.Ext(header.Filename))
+
+	bucketName := "avatars"
+	location := "us-east-1"
+
+	// Проверка - существует ли бакет, если нет - создаем
+	exists, err := minioClient.BucketExists(context.Background(), bucketName)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	if !exists {
+		err = minioClient.MakeBucket(context.Background(), bucketName, minio.MakeBucketOptions{Region: location})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	// Определение политики
+	policy := `{
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Principal": "*",
+                "Action": [
+                    "s3:GetObject"
+                ],
+                "Resource": [
+                    "arn:aws:s3:::avatars/*"
+                ]
+            }
+        ]
+    }`
+
+	// Cтавим чертову политику баскета
+	err = minioClient.SetBucketPolicy(context.Background(), "avatars", policy)
+	if err != nil {
+		panic(err)
+	}
+
+	// Сохраняем файл в MinIO
+	_, err = minioClient.PutObject(context.Background(), bucketName, fileName, file, header.Size, minio.PutObjectOptions{ContentType: header.Header.Get("Content-Type")})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Получаем внешний хост MinIO
+	minioHost := os.Getenv("MINIO_EXTERNAL_HOST")
+	if minioHost == "" {
+		minioHost = "localhost:9000" // замените на ваш внешний хост или доменное имя
+	}
+
+	fileURL := fmt.Sprintf("http://%s/%s/%s", os.Getenv("MINIO_EXTERNAL_HOST"), bucketName, fileName)
+	fmt.Println("Uploaded file URL:", fileURL)
+	fmt.Println("http://%s/%s/%s", minioHost, bucketName, fileName)
+
+	// Создаем пользователя
+	var person models.Person
+	person.ID = primitive.NewObjectID()
+	person.FirstName = c.PostForm("firstName")
+	person.LastName = c.PostForm("lastName")
+	person.City = c.PostForm("city")
+	person.AvatarURL = fileURL
+
+	_, err = collection.InsertOne(context.Background(), person)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
 	c.JSON(http.StatusOK, person)
 }
 
